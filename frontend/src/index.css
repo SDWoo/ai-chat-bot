@@ -1,0 +1,481 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+:root {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #191f28;
+  background-color: #f9fafb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark :root {
+  color: #e5e7eb;
+  background-color: #1a1a1a;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #f9fafb;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark body {
+  background-color: #1a1a1a;
+}
+
+#root {
+  width: 100%;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Toss 스타일 커스텀 스크롤바 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* 부드러운 스크롤 */
+* {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Toss 스타일 애니메이션 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background-size: 1000px 100%;
+}
+
+/* 마크다운 스타일 개선 */
+.markdown-content {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #191f28;
+}
+
+.dark .markdown-content {
+  color: #e5e7eb;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  font-weight: 700;
+  color: #191f28;
+  letter-spacing: -0.02em;
+}
+
+.dark .markdown-content h1,
+.dark .markdown-content h2,
+.dark .markdown-content h3,
+.dark .markdown-content h4 {
+  color: #ffffff;
+}
+
+.markdown-content h1 {
+  font-size: 1.8em;
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
+  line-height: 1.3;
+}
+
+.markdown-content h2 {
+  font-size: 1.5em;
+  margin-top: 1.4em;
+  margin-bottom: 0.7em;
+  line-height: 1.35;
+}
+
+.markdown-content h3 {
+  font-size: 1.25em;
+  margin-top: 1.3em;
+  margin-bottom: 0.6em;
+  line-height: 1.4;
+}
+
+.markdown-content h4 {
+  font-size: 1.1em;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.45;
+}
+
+.markdown-content p {
+  margin-top: 0.6em;
+  margin-bottom: 0.6em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.markdown-content strong {
+  font-weight: 700;
+  color: #191f28;
+}
+
+.dark .markdown-content strong {
+  color: #ffffff;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-top: 0.6em;
+  margin-bottom: 0.6em;
+  padding-left: 1.5em;
+}
+
+.markdown-content li {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  line-height: 1.6;
+}
+
+.markdown-content ul > li {
+  list-style-type: disc;
+}
+
+.markdown-content ol > li {
+  list-style-type: decimal;
+}
+
+.markdown-content ul ul > li {
+  list-style-type: circle;
+}
+
+.markdown-content code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'Courier New', monospace;
+  color: #e01e5a;
+}
+
+.dark .markdown-content code {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ff6b9d;
+}
+
+.markdown-content pre {
+  background-color: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  padding: 1em;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  overflow-x: auto;
+}
+
+.dark .markdown-content pre {
+  background-color: #1e1e1e;
+  border-color: #3a3a3a;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.9em;
+  color: inherit;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #003366;
+  padding-left: 1em;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  color: #4e5968;
+  font-style: italic;
+}
+
+.dark .markdown-content blockquote {
+  color: #9ca3af;
+}
+
+.markdown-content a {
+  color: #003366;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.markdown-content a:hover {
+  color: #004080;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 2px solid #e1e4e8;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.dark .markdown-content hr {
+  border-top-color: #3a3a3a;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #e1e4e8;
+  padding: 0.6em 1em;
+  text-align: left;
+}
+
+.dark .markdown-content th,
+.dark .markdown-content td {
+  border-color: #3a3a3a;
+}
+
+.markdown-content th {
+  background-color: #f6f8fa;
+  font-weight: 700;
+}
+
+.dark .markdown-content th {
+  background-color: #2a2a2a;
+}
+
+/* 사용자 메시지용 마크다운 스타일 */
+.markdown-content-user {
+  color: #191f28;
+}
+
+.dark .markdown-content-user {
+  color: #ffffff;
+}
+
+.markdown-content-user h1,
+.markdown-content-user h2,
+.markdown-content-user h3,
+.markdown-content-user h4 {
+  color: #191f28;
+}
+
+.dark .markdown-content-user h1,
+.dark .markdown-content-user h2,
+.dark .markdown-content-user h3,
+.dark .markdown-content-user h4 {
+  color: #ffffff;
+}
+
+.markdown-content-user strong {
+  color: #191f28;
+  font-weight: 700;
+}
+
+.dark .markdown-content-user strong {
+  color: #ffffff;
+}
+
+.markdown-content-user code {
+  background-color: rgba(0, 51, 102, 0.1);
+  color: #003366;
+}
+
+.dark .markdown-content-user code {
+  background-color: rgba(0, 51, 102, 0.2);
+  color: #6699cc;
+}
+
+.markdown-content-user pre {
+  background-color: rgba(0, 51, 102, 0.05);
+  border-color: rgba(0, 51, 102, 0.15);
+}
+
+.dark .markdown-content-user pre {
+  background-color: rgba(0, 51, 102, 0.1);
+  border-color: rgba(0, 51, 102, 0.3);
+}
+
+.markdown-content-user blockquote {
+  border-left-color: #003366;
+  color: #4e5968;
+}
+
+.dark .markdown-content-user blockquote {
+  color: #9ca3af;
+}
+
+.markdown-content-user a {
+  color: #003366;
+  text-decoration: underline;
+}
+
+.markdown-content-user hr {
+  border-top-color: rgba(0, 51, 102, 0.2);
+}
+
+.dark .markdown-content-user hr {
+  border-top-color: rgba(0, 51, 102, 0.3);
+}
+
+.markdown-content-user th,
+.markdown-content-user td {
+  border-color: rgba(0, 51, 102, 0.2);
+}
+
+.dark .markdown-content-user th,
+.dark .markdown-content-user td {
+  border-color: rgba(0, 51, 102, 0.3);
+}
+
+.markdown-content-user th {
+  background-color: rgba(0, 51, 102, 0.05);
+}
+
+.dark .markdown-content-user th {
+  background-color: rgba(0, 51, 102, 0.1);
+}
+
+/* 모바일 최적화 */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* 터치 타겟 최적화 */
+@layer utilities {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+  
+  /* 입력 필드 상태 스타일 */
+  .input-base {
+    @apply px-4 py-3 border rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none transition-all;
+  }
+  
+  .input-error {
+    @apply border-red-300 dark:border-red-700 focus:ring-2 focus:ring-red-500;
+  }
+  
+  .input-success {
+    @apply border-green-300 dark:border-green-700 focus:ring-2 focus:ring-green-500;
+  }
+  
+  /* 버튼 기본 스타일 */
+  .btn-base {
+    @apply px-4 py-3 rounded-xl font-semibold transition-all focus:outline-none focus:ring-2 min-h-[44px];
+  }
+  
+  .btn-primary {
+    @apply btn-base bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 focus:ring-primary-400 shadow-soft hover:shadow-soft-lg active:scale-95;
+  }
+  
+  .btn-secondary {
+    @apply btn-base bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-gray-400;
+  }
+  
+  /* 카드 호버 효과 */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-soft-lg hover:-translate-y-0.5 cursor-pointer;
+  }
+}
