@@ -155,8 +155,8 @@ async def chat(
 
         # 통합 검색 사용 (search_sources에 따라)
         user_id = current_user["user_id"]
-        if len(request.search_sources) > 1 or "knowledge" in request.search_sources:
-            # 통합 검색 엔진 사용
+        if len(request.search_sources) > 1 or "knowledge" in request.search_sources or "web" in request.search_sources:
+            # 통합 검색 엔진 사용 (웹 검색 포함)
             unified_search = UnifiedSearchEngine()
             result = await unified_search.generate_unified_answer(
                 query=request.message,
@@ -274,8 +274,8 @@ async def chat_stream(
 
         # 통합 검색 사용 (search_sources에 따라)
         user_id = current_user["user_id"]
-        if len(request.search_sources) > 1 or "knowledge" in request.search_sources:
-            # 통합 검색 엔진 사용
+        if len(request.search_sources) > 1 or "knowledge" in request.search_sources or "web" in request.search_sources:
+            # 통합 검색 엔진 사용 (웹 검색 포함)
             unified_search = UnifiedSearchEngine()
             result = await unified_search.generate_unified_answer(
                 query=request.message,
