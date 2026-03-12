@@ -74,3 +74,10 @@ uploads/
 # Logs
 *.log
 logs/
+
+# Cursor
+.cursor/
+
+# Test outputs
+test_results*.json
+ui_test_report.json
