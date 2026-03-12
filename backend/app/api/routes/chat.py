@@ -239,14 +239,14 @@ async def chat_stream(
             db.commit()
             db.refresh(conversation)
 
-            user_message = Message(
-                conversation_id=conversation.id,
-                role="user",
-                content=request.message,
-            )
-            db.add(user_message)
-            db.commit()
-        # else: 재시도 - 기존 대화 사용, user_message는 이미 있음
+        # 사용자 메시지 저장 (새 대화/기존 대화 모두)
+        user_message = Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=request.message,
+        )
+        db.add(user_message)
+        db.commit()
 
         # Get chat history (excluding current message, limit to last 10 for DB query)
         # The RAG engine will further limit this to 5 most recent with token consideration

@@ -239,17 +239,22 @@ export default function ChatPage() {
                     </ReactMarkdown>
                   </div>
 
-                  {message.sources && message.sources.length > 0 && (
+                  {message.sources && message.sources.length > 0 && message.sources.some((s: { content?: string }) => s?.content) && (
                     <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
                       <p className="text-sm font-bold text-gray-900 dark:text-white mb-3">📄 참고 문서</p>
                       <div className="space-y-2">
-                        {message.sources.map((source, idx) => (
+                        {message.sources
+                          .filter((s: { content?: string }) => s?.content)
+                          .map((source: { source?: string; page?: string; content?: string }, idx: number) => (
                           <div
                             key={idx}
                             className="text-sm p-3 bg-[#f9fafb] dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700"
                           >
                             <p className="font-semibold text-gray-900 dark:text-white mb-1">
-                              {source.source} <span className="text-gray-500 dark:text-gray-400">• p.{source.page}</span>
+                              {source.source}
+                              {source.page && source.page !== 'N/A' && (
+                                <span className="text-gray-500 dark:text-gray-400"> • p.{source.page}</span>
+                              )}
                             </p>
                             <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
                               {source.content}...

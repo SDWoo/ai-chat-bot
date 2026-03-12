@@ -5,11 +5,13 @@ import { Upload, FileText, Trash2, CheckCircle, Clock, XCircle, Loader2 } from '
 import { documentService, Document } from '@/services/api'
 import { DocumentListSkeleton } from '@/components/Skeleton'
 import EmptyState from '@/components/EmptyState'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 export default function DocumentsPage() {
   const queryClient = useQueryClient()
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents'],
@@ -208,7 +210,7 @@ export default function DocumentsPage() {
                       </div>
 
                       <button
-                        onClick={() => deleteMutation.mutate(doc.id)}
+                        onClick={() => setDeleteTarget(doc)}
                         disabled={deleteMutation.isPending}
                         className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30 rounded-lg md:rounded-xl transition-all disabled:opacity-50"
                         aria-label="문서 삭제"
@@ -229,6 +231,20 @@ export default function DocumentsPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="문서 삭제"
+        message={deleteTarget ? `"${deleteTarget.filename}" 문서를 삭제하시겠습니까? 삭제된 문서는 복구할 수 없습니다.` : ''}
+        onConfirm={() => {
+          if (deleteTarget) {
+            const id = deleteTarget.id
+            setDeleteTarget(null)
+            deleteMutation.mutate(id)
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }
