@@ -24,7 +24,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' })
   }
 
-  // 새 메시지 추가 또는 스트리밍 완료 시에만 스크롤 (스트리밍 중 매 업데이트마다 스크롤하지 않음)
+  // 새 메시지 추가 시 스크롤
   useEffect(() => {
     if (messages.length > prevMessagesLengthRef.current) {
       scrollToBottom('smooth')
@@ -32,6 +32,15 @@ export default function ChatPage() {
     prevMessagesLengthRef.current = messages.length
   }, [messages.length])
 
+  // 스트리밍 중에는 내용이 늘어날 때마다 스크롤이 따라가도록
+  const lastMessage = messages[messages.length - 1]
+  useEffect(() => {
+    if (isStreaming && lastMessage?.role === 'assistant' && lastMessage?.content) {
+      scrollToBottom('smooth')
+    }
+  }, [isStreaming, lastMessage?.content])
+
+  // 스트리밍 완료 시 한 번 더 스크롤
   useEffect(() => {
     if (!isStreaming && messages.length > 0) {
       scrollToBottom('smooth')
@@ -189,7 +198,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-dark-bg transition-colors duration-200">
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 md:px-6 py-6 md:py-8" style={{ scrollBehavior: 'smooth' }}>
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12 md:py-20 animate-slide-up">
@@ -250,10 +259,10 @@ export default function ChatPage() {
                             key={idx}
                             className="text-sm p-3 bg-[#f9fafb] dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700"
                           >
-                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
-                              {source.source}
+                            <p className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-1 min-w-0" title={source.source}>
+                              <span className="truncate">{source.source}</span>
                               {source.page && source.page !== 'N/A' && (
-                                <span className="text-gray-500 dark:text-gray-400"> • p.{source.page}</span>
+                                <span className="text-gray-500 dark:text-gray-400 shrink-0">• p.{source.page}</span>
                               )}
                             </p>
                             <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">

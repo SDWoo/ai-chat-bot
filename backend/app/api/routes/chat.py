@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+import re
 import structlog
 import uuid
 from datetime import datetime
@@ -18,12 +19,22 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
+def _normalize_source_display_name(raw: str) -> str:
+    """참고문서 표시명 정규화: 타임스탬프_파일명.pdf → 파일명.pdf"""
+    if not raw or raw == "Unknown":
+        return raw
+    # 업로드 시 붙는 숫자_ 또는 숫자.숫자_ 접두사 제거 (예: 1739123456.789_원본.pdf)
+    m = re.match(r"^\d+\.?\d*_(.+)$", raw.strip())
+    return m.group(1) if m else raw
+
+
 def _format_source(doc: dict) -> dict:
     """검색 결과를 프론트엔드 소스 형식으로 변환 (통합/단일 검색 모두 지원)"""
     meta = doc.get("metadata") or {}
     content = doc.get("content") or ""
     score = doc.get("relevance_score") or doc.get("final_score") or doc.get("weighted_score") or 0
-    source = meta.get("source") or meta.get("title") or "Unknown"
+    raw = meta.get("source") or meta.get("title") or "Unknown"
+    source = meta.get("filename") or _normalize_source_display_name(raw) or raw
     return {
         "content": content[:200] if content else "",
         "source": source,

@@ -35,10 +35,12 @@ async def process_document_background(
         embedding_service = EmbeddingService()
 
         doc_processor.validate_file(file_path)
-        
+        db_doc = db.query(DBDocument).filter(DBDocument.id == document_id).first()
+        original_filename = db_doc.filename if db_doc else Path(file_path).name
+
         documents = doc_processor.load_document(
             file_path,
-            metadata={"user_id": str(user_id)},
+            metadata={"user_id": str(user_id), "filename": original_filename},
         )
         
         chunks = chunking_service.chunk_documents(documents, document_id=document_id)
