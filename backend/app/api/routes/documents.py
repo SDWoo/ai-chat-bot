@@ -211,7 +211,7 @@ async def get_document_content(
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        text_types = {".sql", ".txt", ".md", ".csv"}
+        text_types = {".sql", ".tst", ".txt", ".md", ".csv"}
         if document.file_type not in text_types:
             raise HTTPException(
                 status_code=400,

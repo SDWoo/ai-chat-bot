@@ -71,7 +71,7 @@ export default function DocumentsPage() {
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/plain': ['.txt', '.sql'],
+      'text/plain': ['.txt', '.sql', '.tst'],
       'text/markdown': ['.md'],
       'text/csv': ['.csv'],
     },
@@ -162,7 +162,7 @@ export default function DocumentsPage() {
                 파일을 드래그하거나 클릭하여 업로드
               </p>
               <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                지원 형식: PDF, DOCX, TXT, MD, CSV, SQL (최대 50MB)
+                지원 형식: PDF, DOCX, TXT, MD, CSV, SQL, TST (최대 50MB)
               </p>
             </div>
           )}
@@ -187,9 +187,9 @@ export default function DocumentsPage() {
                   <div className="flex items-start md:items-center justify-between gap-3 md:gap-4">
                     <div className="flex items-start md:items-center gap-3 md:gap-4 flex-1 min-w-0">
                       <div className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br ${
-                        doc.file_type === '.sql' ? 'from-emerald-500 to-teal-600' : 'from-primary-500 to-primary-600'
+                        ['.sql', '.tst'].includes(doc.file_type) ? 'from-emerald-500 to-teal-600' : 'from-primary-500 to-primary-600'
                       } rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 shadow-soft`}>
-                        {doc.file_type === '.sql' ? (
+                        {['.sql', '.tst'].includes(doc.file_type) ? (
                           <FileCode2 className="text-white" size={20} strokeWidth={2} />
                         ) : (
                           <FileText className="text-white" size={20} strokeWidth={2} />
@@ -219,7 +219,7 @@ export default function DocumentsPage() {
                         </span>
                       </div>
 
-                      {['.sql', '.txt', '.md'].includes(doc.file_type) && doc.status === 'completed' && (
+                      {['.sql', '.tst', '.txt', '.md'].includes(doc.file_type) && doc.status === 'completed' && (
                         <button
                           onClick={() => setSqlPreview({ isOpen: true, documentId: doc.id, filename: doc.filename })}
                           className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 rounded-lg md:rounded-xl transition-all"

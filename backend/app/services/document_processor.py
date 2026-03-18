@@ -24,6 +24,7 @@ class DocumentProcessor:
             ".md": TextLoader,
             ".csv": CSVLoader,
             ".sql": TextLoader,
+            ".tst": TextLoader,
         }
 
     def load_document(self, file_path: str, metadata: Optional[dict] = None) -> List[Document]:
@@ -39,7 +40,7 @@ class DocumentProcessor:
 
             loader_class = self.loaders_map[file_extension]
             
-            if file_extension in [".txt", ".md", ".sql"]:
+            if file_extension in [".txt", ".md", ".sql", ".tst"]:
                 loader = loader_class(file_path, encoding="utf-8")
             else:
                 loader = loader_class(file_path)

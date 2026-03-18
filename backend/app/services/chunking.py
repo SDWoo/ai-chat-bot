@@ -40,21 +40,12 @@ class ChunkingService:
             length_function=self._tiktoken_length,
         )
 
-        # SQL 전용 분리자: 구문 경계 → 블록 경계 → 줄 순으로 자연 분리
-        self.sql_splitter = RecursiveCharacterTextSplitter(
+        # SQL 전용 분리자는 _split_sql_statements 메서드에서 직접 처리
+        self.sql_fallback_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=self._tiktoken_length,
-            separators=[
-                "\nCREATE ", "\ncreate ",
-                "\nPACKAGE ", "\npackage ",
-                "\nPROCEDURE ", "\nprocedure ",
-                "\nFUNCTION ", "\nfunction ",
-                "\nBEGIN", "\nbegin",
-                "\nEND;", "\nend;",
-                ";\n",
-                "\n\n", "\n", " ", "",
-            ],
+            separators=[";\n", "\n\n", "\n", " ", ""],
             keep_separator=True,
         )
 
@@ -86,13 +77,13 @@ class ChunkingService:
                 if file_type == ".md":
                     doc_chunks = self.markdown_splitter.split_documents([doc])
                     logger.debug(f"Using MarkdownTextSplitter for document {doc_idx}")
-                elif file_type == ".sql":
+                elif file_type in (".sql", ".tst"):
                     sql_meta = self._extract_sql_metadata(doc.page_content, doc.metadata)
                     doc.metadata.update(sql_meta)
-                    doc_chunks = self.sql_splitter.split_documents([doc])
+                    doc_chunks = self._split_sql_by_statements(doc)
                     for chunk in doc_chunks:
                         chunk.metadata.update(sql_meta)
-                    logger.debug(f"Using SQL splitter for document {doc_idx}")
+                    logger.debug(f"Using SQL statement splitter for document {doc_idx}, {len(doc_chunks)} chunks")
                 else:
                     doc_chunks = self.text_splitter.split_documents([doc])
                 
@@ -140,6 +131,49 @@ class ChunkingService:
         except Exception as e:
             logger.error(f"Error chunking text: {str(e)}")
             raise
+
+    def _split_sql_by_statements(self, doc: Document) -> List[Document]:
+        """SQL을 구문(statement) 단위로 분리한 뒤, chunk_size에 맞게 병합/재분할"""
+        content = doc.page_content
+        # 세미콜론+줄바꿈 또는 '/' 단독 줄을 기준으로 구문 분리
+        raw_stmts = re.split(r';[ \t]*\n|^/[ \t]*$', content, flags=re.MULTILINE)
+        statements = [s.strip() for s in raw_stmts if s and s.strip()]
+
+        if not statements:
+            return [doc]
+
+        chunks: List[Document] = []
+        current_text = ""
+
+        for stmt in statements:
+            candidate = (current_text + ";\n\n" + stmt) if current_text else stmt
+            if self._tiktoken_length(candidate) > self.chunk_size and current_text:
+                chunks.append(Document(
+                    page_content=current_text,
+                    metadata=dict(doc.metadata),
+                ))
+                # 큰 구문은 fallback splitter로 재분할
+                if self._tiktoken_length(stmt) > self.chunk_size:
+                    sub = self.sql_fallback_splitter.split_documents([
+                        Document(page_content=stmt, metadata=dict(doc.metadata))
+                    ])
+                    chunks.extend(sub)
+                    current_text = ""
+                else:
+                    current_text = stmt
+            else:
+                current_text = candidate
+
+        if current_text.strip():
+            chunks.append(Document(
+                page_content=current_text,
+                metadata=dict(doc.metadata),
+            ))
+
+        if not chunks:
+            chunks = [doc]
+
+        return chunks
 
     def _extract_sql_metadata(self, content: str, existing_meta: dict) -> dict:
         """SQL 파일 내용에서 테이블/패키지/프로시저 등 메타데이터 추출"""

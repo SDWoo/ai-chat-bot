@@ -259,7 +259,7 @@ export default function ChatPage() {
                         {message.sources
                           .filter((s: { content?: string }) => s?.content)
                           .map((source: { source?: string; page?: string; content?: string; file_type?: string; document_id?: number; sql_type?: string }, idx: number) => {
-                            const isSql = source.file_type === '.sql'
+                            const isSql = source.file_type === '.sql' || source.file_type === '.tst'
                             const canPreview = isSql && source.document_id
                             return (
                               <div

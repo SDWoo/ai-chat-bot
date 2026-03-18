@@ -46,10 +46,18 @@ def _format_source(doc: dict) -> dict:
     doc_id = meta.get("document_id")
     if doc_id:
         result["document_id"] = int(doc_id) if str(doc_id).isdigit() else doc_id
-    if file_type == ".sql":
+    if file_type in (".sql", ".tst"):
         result["sql_type"] = meta.get("sql_type", "")
         result["sql_tables"] = meta.get("sql_tables", "")
     return result
+
+
+def _filter_relevant_sources(sources: list, min_score: float = 0.15) -> list:
+    """관련도가 낮은 소스 제거 — 실제 참고된 문서만 프론트에 표시"""
+    if not sources:
+        return sources
+    filtered = [s for s in sources if s.get("relevance_score", 0) >= min_score]
+    return filtered if filtered else sources[:1]
 
 
 async def stream_response(
@@ -202,7 +210,7 @@ async def chat(
             conversation_id=conversation.id,
             role="assistant",
             content=result["answer"],
-            sources=[_format_source(doc) for doc in result.get("sources", [])],
+            sources=_filter_relevant_sources([_format_source(doc) for doc in result.get("sources", [])]),
         )
         db.add(assistant_message)
         db.commit()
@@ -317,7 +325,7 @@ async def chat_stream(
                 user_id=user_id,
             )
 
-        sources = [_format_source(doc) for doc in result.get("sources", [])]
+        sources = _filter_relevant_sources([_format_source(doc) for doc in result.get("sources", [])])
 
         return StreamingResponse(
             stream_response(

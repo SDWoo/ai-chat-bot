@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 160  # 20% overlap for better context continuity
     
     MAX_FILE_SIZE_MB: int = 50
-    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt", "md", "csv", "sql"]
+    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt", "md", "csv", "sql", "tst"]
     
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
