@@ -113,6 +113,16 @@ export const documentService = {
   async deleteDocument(id: number) {
     await api.delete(`/api/documents/${id}`)
   },
+
+  async getDocumentContent(id: number) {
+    const response = await api.get<{
+      id: number
+      filename: string
+      file_type: string
+      content: string
+    }>(`/api/documents/${id}/content`)
+    return response.data
+  },
 }
 
 export const chatService = {

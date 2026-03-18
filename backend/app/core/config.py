@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -12,12 +12,14 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    API_PORT: int = 8000
+    API_PORT: int = 8000  # Railway는 PORT env 사용 시 그 값으로 동작
     
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-large"
     
+    # PostgreSQL: Railway 등은 DATABASE_URL 하나로 제공 → 있으면 우선 사용
+    database_url: Optional[str] = None
     POSTGRES_USER: str = "chatbot"
     POSTGRES_PASSWORD: str = "chatbot123"
     POSTGRES_HOST: str = "localhost"
@@ -26,14 +28,20 @@ class Settings(BaseSettings):
     
     @property
     def DATABASE_URL(self) -> str:
+        if self.database_url:
+            return self.database_url
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
+    # Redis: Railway 등은 REDIS_URL 하나로 제공 → 있으면 우선 사용
+    redis_url: Optional[str] = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     
     @property
     def REDIS_URL(self) -> str:
+        if self.redis_url:
+            return self.redis_url
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
     
     CHROMA_PERSIST_DIR: str = "./data/chromadb"

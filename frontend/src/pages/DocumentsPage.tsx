@@ -1,17 +1,21 @@
 import { useCallback, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, Trash2, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react'
+import { Upload, FileText, FileCode2, Trash2, CheckCircle, Clock, XCircle, Loader2, Eye } from 'lucide-react'
 import { documentService, Document } from '@/services/api'
 import { DocumentListSkeleton } from '@/components/Skeleton'
 import EmptyState from '@/components/EmptyState'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import SqlPreviewModal from '@/components/SqlPreviewModal'
 
 export default function DocumentsPage() {
   const queryClient = useQueryClient()
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
+  const [sqlPreview, setSqlPreview] = useState<{ isOpen: boolean; documentId: number | null; filename: string }>({
+    isOpen: false, documentId: null, filename: '',
+  })
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents'],
@@ -182,8 +186,14 @@ export default function DocumentsPage() {
                 >
                   <div className="flex items-start md:items-center justify-between gap-3 md:gap-4">
                     <div className="flex items-start md:items-center gap-3 md:gap-4 flex-1 min-w-0">
-                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 shadow-soft">
-                        <FileText className="text-white" size={20} strokeWidth={2} />
+                      <div className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br ${
+                        doc.file_type === '.sql' ? 'from-emerald-500 to-teal-600' : 'from-primary-500 to-primary-600'
+                      } rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 shadow-soft`}>
+                        {doc.file_type === '.sql' ? (
+                          <FileCode2 className="text-white" size={20} strokeWidth={2} />
+                        ) : (
+                          <FileText className="text-white" size={20} strokeWidth={2} />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm md:text-[15px] font-bold text-[#191f28] dark:text-white truncate mb-1">
@@ -209,6 +219,15 @@ export default function DocumentsPage() {
                         </span>
                       </div>
 
+                      {['.sql', '.txt', '.md'].includes(doc.file_type) && doc.status === 'completed' && (
+                        <button
+                          onClick={() => setSqlPreview({ isOpen: true, documentId: doc.id, filename: doc.filename })}
+                          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 rounded-lg md:rounded-xl transition-all"
+                          aria-label="미리보기"
+                        >
+                          <Eye size={18} strokeWidth={2} />
+                        </button>
+                      )}
                       <button
                         onClick={() => setDeleteTarget(doc)}
                         disabled={deleteMutation.isPending}
@@ -244,6 +263,13 @@ export default function DocumentsPage() {
           }
         }}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <SqlPreviewModal
+        isOpen={sqlPreview.isOpen}
+        documentId={sqlPreview.documentId}
+        filename={sqlPreview.filename}
+        onClose={() => setSqlPreview({ isOpen: false, documentId: null, filename: '' })}
       />
     </div>
   )

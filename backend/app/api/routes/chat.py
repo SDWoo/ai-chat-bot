@@ -35,12 +35,21 @@ def _format_source(doc: dict) -> dict:
     score = doc.get("relevance_score") or doc.get("final_score") or doc.get("weighted_score") or 0
     raw = meta.get("source") or meta.get("title") or "Unknown"
     source = meta.get("filename") or _normalize_source_display_name(raw) or raw
-    return {
+    file_type = meta.get("file_type", "")
+    result: dict = {
         "content": content[:200] if content else "",
         "source": source,
         "page": meta.get("page", "N/A"),
         "relevance_score": float(score),
+        "file_type": file_type,
     }
+    doc_id = meta.get("document_id")
+    if doc_id:
+        result["document_id"] = int(doc_id) if str(doc_id).isdigit() else doc_id
+    if file_type == ".sql":
+        result["sql_type"] = meta.get("sql_type", "")
+        result["sql_tables"] = meta.get("sql_tables", "")
+    return result
 
 
 async def stream_response(

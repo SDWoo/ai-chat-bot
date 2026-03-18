@@ -195,6 +195,49 @@ async def get_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{document_id}/content")
+async def get_document_content(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_required),
+):
+    """SQL/텍스트 파일의 원본 내용을 반환합니다."""
+    try:
+        document = db.query(DBDocument).filter(
+            DBDocument.id == document_id,
+            DBDocument.user_id == current_user["user_id"],
+        ).first()
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        text_types = {".sql", ".txt", ".md", ".csv"}
+        if document.file_type not in text_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Content preview not supported for {document.file_type} files",
+            )
+
+        if not os.path.exists(document.file_path):
+            raise HTTPException(status_code=404, detail="File not found on disk")
+
+        with open(document.file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        return {
+            "id": document.id,
+            "filename": document.filename,
+            "file_type": document.file_type,
+            "content": content,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reading document content: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,

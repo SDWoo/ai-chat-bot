@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Send, ThumbsUp, ThumbsDown, MessageSquare, BookmarkPlus, Loader2 } from 'lucide-react'
+import { Send, ThumbsUp, ThumbsDown, MessageSquare, BookmarkPlus, Loader2, FileCode2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { useChatStore } from '@/store/chatStore'
 import { chatService, conversationService, Message } from '@/services/api'
+import SqlPreviewModal from '@/components/SqlPreviewModal'
 
 export default function ChatPage() {
   const [input, setInput] = useState('')
@@ -13,6 +14,9 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [_streamingMessageId, setStreamingMessageId] = useState<number | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [sqlPreview, setSqlPreview] = useState<{ isOpen: boolean; documentId: number | null; filename: string }>({
+    isOpen: false, documentId: null, filename: '',
+  })
   const [searchSources, setSearchSources] = useState<string[]>(['documents', 'knowledge'])
   const [extractingKnowledge, setExtractingKnowledge] = useState(false)
   const [feedbackStates, setFeedbackStates] = useState<Record<number, 'positive' | 'negative' | null>>({})
@@ -254,22 +258,42 @@ export default function ChatPage() {
                       <div className="space-y-2">
                         {message.sources
                           .filter((s: { content?: string }) => s?.content)
-                          .map((source: { source?: string; page?: string; content?: string }, idx: number) => (
-                          <div
-                            key={idx}
-                            className="text-sm p-3 bg-[#f9fafb] dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700"
-                          >
-                            <p className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-1 min-w-0" title={source.source}>
-                              <span className="truncate">{source.source}</span>
-                              {source.page && source.page !== 'N/A' && (
-                                <span className="text-gray-500 dark:text-gray-400 shrink-0">• p.{source.page}</span>
-                              )}
-                            </p>
-                            <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
-                              {source.content}...
-                            </p>
-                          </div>
-                        ))}
+                          .map((source: { source?: string; page?: string; content?: string; file_type?: string; document_id?: number; sql_type?: string }, idx: number) => {
+                            const isSql = source.file_type === '.sql'
+                            const canPreview = isSql && source.document_id
+                            return (
+                              <div
+                                key={idx}
+                                className={`text-sm p-3 bg-[#f9fafb] dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 transition-all ${
+                                  canPreview ? 'cursor-pointer hover:border-primary-300 dark:hover:border-primary-500/40 hover:shadow-sm' : ''
+                                }`}
+                                onClick={() => {
+                                  if (canPreview && source.document_id) {
+                                    setSqlPreview({ isOpen: true, documentId: source.document_id, filename: source.source || 'SQL' })
+                                  }
+                                }}
+                              >
+                                <p className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-1.5 min-w-0" title={source.source}>
+                                  {isSql && <FileCode2 size={14} className="text-emerald-500 shrink-0" />}
+                                  <span className="truncate">{source.source}</span>
+                                  {source.page && source.page !== 'N/A' && (
+                                    <span className="text-gray-500 dark:text-gray-400 shrink-0">• p.{source.page}</span>
+                                  )}
+                                  {isSql && source.sql_type && (
+                                    <span className="text-xs px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-md shrink-0 font-medium">
+                                      {source.sql_type}
+                                    </span>
+                                  )}
+                                  {canPreview && (
+                                    <span className="text-xs text-primary-500 shrink-0 font-medium ml-auto">미리보기</span>
+                                  )}
+                                </p>
+                                <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
+                                  {source.content}...
+                                </p>
+                              </div>
+                            )
+                          })}
                       </div>
                     </div>
                   )}
@@ -396,6 +420,13 @@ export default function ChatPage() {
           </div>
         </form>
       </div>
+
+      <SqlPreviewModal
+        isOpen={sqlPreview.isOpen}
+        documentId={sqlPreview.documentId}
+        filename={sqlPreview.filename}
+        onClose={() => setSqlPreview({ isOpen: false, documentId: null, filename: '' })}
+      />
     </div>
   )
 }

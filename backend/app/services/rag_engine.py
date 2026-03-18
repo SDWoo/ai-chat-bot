@@ -6,7 +6,7 @@ import tiktoken
 
 from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import LLMService
-from app.core.prompts import RAG_SYSTEM_PROMPT, CONVERSATIONAL_SYSTEM_PROMPT
+from app.core.prompts import RAG_SYSTEM_PROMPT, CONVERSATIONAL_SYSTEM_PROMPT, SQL_RAG_SYSTEM_PROMPT
 
 logger = structlog.get_logger()
 
@@ -277,8 +277,14 @@ class RAGEngine:
             filtered_documents = self._remove_duplicate_sources(documents, max_sources=max_sources)
 
             context = self._format_context(documents)
-            
-            # Use conversational prompt if chat history exists
+
+            # SQL 파일이 검색 결과에 포함되어 있는지 확인
+            has_sql_sources = any(
+                doc.get("metadata", {}).get("content_type") == "sql"
+                or doc.get("metadata", {}).get("file_type") == ".sql"
+                for doc in documents
+            )
+
             use_conversational = bool(chat_history and len(chat_history) > 0)
             
             if use_conversational:
@@ -289,6 +295,12 @@ class RAGEngine:
                     question=query,
                 )
                 logger.info("Using conversational prompt with history")
+            elif has_sql_sources:
+                system_prompt = SQL_RAG_SYSTEM_PROMPT.format(
+                    context=context,
+                    question=query,
+                )
+                logger.info("Using SQL RAG prompt (SQL sources detected)")
             else:
                 system_prompt = RAG_SYSTEM_PROMPT.format(
                     context=context,

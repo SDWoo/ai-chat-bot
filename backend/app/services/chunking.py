@@ -1,6 +1,7 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter, MarkdownTextSplitter
 from langchain.schema import Document
 from typing import List, Optional
+import re
 import structlog
 import tiktoken
 
@@ -25,7 +26,6 @@ class ChunkingService:
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
         
-        # 구조 인식 분리자: 섹션 → 단락 → 문장 → 단어 순으로 자연 경계 유지
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -34,11 +34,28 @@ class ChunkingService:
             keep_separator=True,
         )
         
-        # Markdown-specific splitter
         self.markdown_splitter = MarkdownTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=self._tiktoken_length,
+        )
+
+        # SQL 전용 분리자: 구문 경계 → 블록 경계 → 줄 순으로 자연 분리
+        self.sql_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=self._tiktoken_length,
+            separators=[
+                "\nCREATE ", "\ncreate ",
+                "\nPACKAGE ", "\npackage ",
+                "\nPROCEDURE ", "\nprocedure ",
+                "\nFUNCTION ", "\nfunction ",
+                "\nBEGIN", "\nbegin",
+                "\nEND;", "\nend;",
+                ";\n",
+                "\n\n", "\n", " ", "",
+            ],
+            keep_separator=True,
         )
 
     def _tiktoken_length(self, text: str) -> int:
@@ -69,6 +86,13 @@ class ChunkingService:
                 if file_type == ".md":
                     doc_chunks = self.markdown_splitter.split_documents([doc])
                     logger.debug(f"Using MarkdownTextSplitter for document {doc_idx}")
+                elif file_type == ".sql":
+                    sql_meta = self._extract_sql_metadata(doc.page_content, doc.metadata)
+                    doc.metadata.update(sql_meta)
+                    doc_chunks = self.sql_splitter.split_documents([doc])
+                    for chunk in doc_chunks:
+                        chunk.metadata.update(sql_meta)
+                    logger.debug(f"Using SQL splitter for document {doc_idx}")
                 else:
                     doc_chunks = self.text_splitter.split_documents([doc])
                 
@@ -116,6 +140,46 @@ class ChunkingService:
         except Exception as e:
             logger.error(f"Error chunking text: {str(e)}")
             raise
+
+    def _extract_sql_metadata(self, content: str, existing_meta: dict) -> dict:
+        """SQL 파일 내용에서 테이블/패키지/프로시저 등 메타데이터 추출"""
+        meta: dict = {"content_type": "sql"}
+        upper = content.upper()
+
+        tables = set()
+        for pattern in [
+            r'(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+([A-Za-z_][A-Za-z0-9_.]+)',
+        ]:
+            tables.update(m.group(1).upper() for m in re.finditer(pattern, content, re.IGNORECASE))
+        if tables:
+            meta["sql_tables"] = ", ".join(sorted(tables)[:20])
+
+        packages = re.findall(
+            r'(?:CREATE\s+(?:OR\s+REPLACE\s+)?PACKAGE\s+(?:BODY\s+)?)\s*([A-Za-z_][A-Za-z0-9_.]+)',
+            content, re.IGNORECASE,
+        )
+        if packages:
+            meta["sql_packages"] = ", ".join(set(p.upper() for p in packages))
+
+        procedures = re.findall(
+            r'(?:CREATE\s+(?:OR\s+REPLACE\s+)?)?(?:PROCEDURE|FUNCTION)\s+([A-Za-z_][A-Za-z0-9_.]+)',
+            content, re.IGNORECASE,
+        )
+        if procedures:
+            meta["sql_procedures"] = ", ".join(set(p.upper() for p in procedures))
+
+        if "PACKAGE" in upper:
+            meta["sql_type"] = "package"
+        elif "PROCEDURE" in upper:
+            meta["sql_type"] = "procedure"
+        elif "FUNCTION" in upper:
+            meta["sql_type"] = "function"
+        elif any(kw in upper for kw in ["SELECT", "INSERT", "UPDATE", "DELETE"]):
+            meta["sql_type"] = "query"
+        else:
+            meta["sql_type"] = "script"
+
+        return meta
 
     def get_optimal_chunk_params(self, documents: List[Document]) -> dict:
         """
