@@ -32,6 +32,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: chatbot-backend
+    ports:
+      # 0.0.0.0 바인딩으로 LAN/외부에서 접근 가능 (방화벽에서 8000 포트 허용 필요)
+      - "0.0.0.0:8000:8000"
     volumes:
       - chromadb_data:/app/data/chromadb
     environment:
@@ -50,8 +53,8 @@ services:
       MS_CLIENT_SECRET: ${MS_CLIENT_SECRET:-}
       MS_TENANT_ID: ${MS_TENANT_ID:-common}
       MS_REDIRECT_URI: ${MS_REDIRECT_URI:-}
-      FRONTEND_URL: ${FRONTEND_URL:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:80","http://localhost"]}
+      FRONTEND_URL: ${FRONTEND_URL:-https://saichat.vercel.app}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:80","http://localhost","https://saichat.vercel.app"]}
     depends_on:
       postgres:
         condition: service_healthy

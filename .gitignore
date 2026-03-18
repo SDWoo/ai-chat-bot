@@ -81,3 +81,6 @@ logs/
 # Test outputs
 test_results*.json
 ui_test_report.json
+
+.vercel
+.env*.local

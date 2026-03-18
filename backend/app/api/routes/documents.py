@@ -221,8 +221,17 @@ async def get_document_content(
         if not os.path.exists(document.file_path):
             raise HTTPException(status_code=404, detail="File not found on disk")
 
-        with open(document.file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = None
+        for enc in ["utf-8", "utf-8-sig", "euc-kr", "cp949", "latin-1"]:
+            try:
+                with open(document.file_path, "r", encoding=enc) as f:
+                    content = f.read()
+                break
+            except (UnicodeDecodeError, LookupError):
+                continue
+
+        if content is None:
+            raise HTTPException(status_code=500, detail="Could not decode file with any supported encoding")
 
         return {
             "id": document.id,

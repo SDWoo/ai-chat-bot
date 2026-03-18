@@ -12,6 +12,7 @@ export default function DocumentsPage() {
   const queryClient = useQueryClient()
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
   const [sqlPreview, setSqlPreview] = useState<{ isOpen: boolean; documentId: number | null; filename: string }>({
     isOpen: false, documentId: null, filename: '',
@@ -23,22 +24,6 @@ export default function DocumentsPage() {
     refetchInterval: 5000,
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: documentService.uploadDocument,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] })
-      setUploadProgress(100)
-      setTimeout(() => {
-        setUploading(false)
-        setUploadProgress(0)
-      }, 500)
-    },
-    onError: () => {
-      setUploading(false)
-      setUploadProgress(0)
-    },
-  })
-
   const deleteMutation = useMutation({
     mutationFn: documentService.deleteDocument,
     onSuccess: () => {
@@ -46,25 +31,42 @@ export default function DocumentsPage() {
     },
   })
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setUploading(true)
-      setUploadProgress(0)
-      
-      // 프로그레스 시뮬레이션
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return 90
-          }
-          return prev + Math.random() * 15
-        })
-      }, 200)
-      
-      uploadMutation.mutate(acceptedFiles[0])
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    const total = acceptedFiles.length
+    let completed = 0
+    let failed = 0
+
+    for (const file of acceptedFiles) {
+      setUploadStatus(`${file.name} 업로드 중... (${completed + 1}/${total})`)
+      try {
+        await documentService.uploadDocument(file)
+        completed++
+        setUploadProgress(Math.round((completed / total) * 100))
+        queryClient.invalidateQueries({ queryKey: ['documents'] })
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err)
+        failed++
+        completed++
+        setUploadProgress(Math.round((completed / total) * 100))
+      }
     }
-  }, [uploadMutation])
+
+    setUploadStatus(
+      failed > 0
+        ? `완료: ${total - failed}개 성공, ${failed}개 실패`
+        : `${total}개 파일 업로드 완료`
+    )
+    setTimeout(() => {
+      setUploading(false)
+      setUploadProgress(0)
+      setUploadStatus('')
+    }, 1500)
+  }, [queryClient])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -75,7 +77,6 @@ export default function DocumentsPage() {
       'text/markdown': ['.md'],
       'text/csv': ['.csv'],
     },
-    maxFiles: 1,
     disabled: uploading,
   })
 
@@ -140,7 +141,7 @@ export default function DocumentsPage() {
           {uploading ? (
             <div className="space-y-3 md:space-y-4">
               <p className="text-base md:text-lg font-bold text-[#191f28] dark:text-white mb-2">
-                업로드 중... {Math.round(uploadProgress)}%
+                {uploadStatus || `업로드 중... ${Math.round(uploadProgress)}%`}
               </p>
               <div className="w-full max-w-md mx-auto h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div 
@@ -159,7 +160,7 @@ export default function DocumentsPage() {
           ) : (
             <div>
               <p className="text-base md:text-lg font-bold text-[#191f28] dark:text-white mb-2">
-                파일을 드래그하거나 클릭하여 업로드
+                파일을 드래그하거나 클릭하여 업로드 (여러 파일 가능)
               </p>
               <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
                 지원 형식: PDF, DOCX, TXT, MD, CSV, SQL, TST (최대 50MB)
