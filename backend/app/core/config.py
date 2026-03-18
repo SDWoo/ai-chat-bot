@@ -2,42 +2,49 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 
 
+def _fix_postgres_url(url: str) -> str:
+    """Render/Heroku는 postgres:// 를 주지만 SQLAlchemy 2.0+는 postgresql:// 필요"""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    API_PORT: int = 8000  # Railway는 PORT env 사용 시 그 값으로 동작
-    
+    API_PORT: int = 8000
+
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-large"
-    
-    # PostgreSQL: Railway 등은 DATABASE_URL 하나로 제공 → 있으면 우선 사용
+
+    # PostgreSQL: Render/Railway는 DATABASE_URL 하나로 제공
     database_url: Optional[str] = None
     POSTGRES_USER: str = "chatbot"
     POSTGRES_PASSWORD: str = "chatbot123"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "chatbot"
-    
+
     @property
     def DATABASE_URL(self) -> str:
         if self.database_url:
-            return self.database_url
+            return _fix_postgres_url(self.database_url)
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-    
-    # Redis: Railway 등은 REDIS_URL 하나로 제공 → 있으면 우선 사용
+
+    # Redis: Render/Railway는 REDIS_URL 하나로 제공
     redis_url: Optional[str] = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    
+
     @property
     def REDIS_URL(self) -> str:
         if self.redis_url:
