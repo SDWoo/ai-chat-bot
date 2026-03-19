@@ -398,7 +398,7 @@ class UnifiedSearchEngine:
         top_k: int = 10,
         chat_history: Optional[List[Dict[str, str]]] = None,
         stream: bool = False,
-        max_sources: int = 3,
+        max_sources: int = 5,
         user_id: Optional[int] = None,
         image_base64: Optional[str] = None,
     ) -> Dict[str, Any]:

@@ -37,6 +37,7 @@ services:
       - "0.0.0.0:8000:8000"
     volumes:
       - chromadb_data:/app/data/chromadb
+      - uploads_data:/app/uploads
     environment:
       ENVIRONMENT: production
       DEBUG: "false"
@@ -80,3 +81,4 @@ volumes:
   postgres_data:
   redis_data:
   chromadb_data:
+  uploads_data:

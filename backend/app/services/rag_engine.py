@@ -132,71 +132,57 @@ class RAGEngine:
             return results
 
     def _remove_duplicate_sources(
-        self, 
-        documents: List[Dict[str, Any]], 
-        max_sources: int = 2,
-        similarity_threshold: float = 0.85
+        self,
+        documents: List[Dict[str, Any]],
+        max_sources: int = 5,
+        similarity_threshold: float = 0.92,
     ) -> List[Dict[str, Any]]:
         """
-        Remove duplicate or highly similar sources and limit to max_sources.
-        
-        Args:
-            documents: List of document dictionaries
-            max_sources: Maximum number of sources to return
-            similarity_threshold: Threshold for considering documents as similar
-        
-        Returns:
-            Filtered list of documents
+        중복 청크 제거 후 max_sources 개수까지 반환.
+        - 동일 source + 동일 page: 중복 처리
+        - 내용 유사도 >= similarity_threshold: 더 높은 점수 유지
+        - 다른 파일의 청크는 항상 포함 (파일 다양성 보장)
         """
         if not documents:
             return []
-        
-        filtered_docs = []
-        
+
+        filtered_docs: List[Dict[str, Any]] = []
+
         for doc in documents:
             is_duplicate = False
-            doc_content = doc['content'].lower()
-            
-            for existing_doc in filtered_docs:
-                existing_content = existing_doc['content'].lower()
-                
-                # Check if documents are from the same source and page
-                same_source = (
-                    doc['metadata'].get('source') == existing_doc['metadata'].get('source') and
-                    doc['metadata'].get('page') == existing_doc['metadata'].get('page')
-                )
-                
-                if same_source:
+            doc_content = doc.get('content', '').lower()
+            doc_source = doc.get('metadata', {}).get('source', '')
+            doc_page = doc.get('metadata', {}).get('page')
+
+            for i, existing_doc in enumerate(filtered_docs):
+                ex_source = existing_doc.get('metadata', {}).get('source', '')
+                ex_page = existing_doc.get('metadata', {}).get('page')
+
+                # 완전히 동일한 청크(source + page 동일)만 중복으로 처리
+                if doc_source == ex_source and doc_page == ex_page and doc_source != '':
                     is_duplicate = True
                     break
-                
-                # Calculate simple content similarity
-                shorter_len = min(len(doc_content), len(existing_content))
-                if shorter_len > 0:
-                    # Count matching words
-                    doc_words = set(doc_content.split())
-                    existing_words = set(existing_content.split())
-                    
-                    if doc_words and existing_words:
-                        overlap = len(doc_words & existing_words)
-                        similarity = overlap / max(len(doc_words), len(existing_words))
-                        
-                        if similarity >= similarity_threshold:
-                            # Keep the one with higher relevance score
-                            if doc.get('relevance_score', 0) <= existing_doc.get('relevance_score', 0):
-                                is_duplicate = True
-                                break
-                            else:
-                                # Replace the existing one with the new one
-                                filtered_docs.remove(existing_doc)
-            
+
+                # 내용 유사도 체크 (높은 임계값으로 보수적으로 처리)
+                ex_content = existing_doc.get('content', '').lower()
+                doc_words = set(doc_content.split())
+                ex_words = set(ex_content.split())
+                if doc_words and ex_words:
+                    overlap = len(doc_words & ex_words)
+                    similarity = overlap / max(len(doc_words), len(ex_words))
+                    if similarity >= similarity_threshold:
+                        # 더 낮은 점수면 중복으로 간주, 더 높은 점수면 교체
+                        if doc.get('relevance_score', 0) > existing_doc.get('relevance_score', 0):
+                            filtered_docs[i] = doc
+                        is_duplicate = True
+                        break
+
             if not is_duplicate:
                 filtered_docs.append(doc)
-            
-            # Stop if we have enough sources
+
             if len(filtered_docs) >= max_sources:
                 break
-        
+
         return filtered_docs[:max_sources]
 
     def _format_context(self, documents: List[Dict[str, Any]]) -> str:
@@ -222,10 +208,10 @@ class RAGEngine:
         self,
         query: str,
         collection_name: str = "documents",
-        top_k: int = 4,
+        top_k: int = 8,
         chat_history: Optional[List[Dict[str, str]]] = None,
         stream: bool = False,
-        max_sources: int = 2,
+        max_sources: int = 5,
         user_id: Optional[int] = None,
         image_base64: Optional[str] = None,
     ) -> Dict[str, Any]:

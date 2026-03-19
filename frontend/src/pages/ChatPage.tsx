@@ -132,7 +132,8 @@ export default function ChatPage() {
         id: Date.now(),
         role: 'user',
         content: message,
-        image_url: pendingImage?.preview,
+        // base64 data URL을 사용해야 blob: URL처럼 revoke 후 깨지지 않음
+        image_url: pendingImage?.base64,
         created_at: new Date().toISOString(),
       }
       addMessage(userMessage)
@@ -168,7 +169,7 @@ export default function ChatPage() {
             message,
             image_data: imageData,
             conversation_id: conversationIdToUse,
-            top_k: 4,
+            top_k: 8,
             search_sources: searchSources,
           },
           {
