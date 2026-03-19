@@ -9,6 +9,19 @@ from app.core.config import settings
 logger = structlog.get_logger()
 
 
+def _build_human_content(text: str, image_base64: Optional[str] = None) -> Any:
+    """텍스트 + 이미지(base64)를 HumanMessage content로 변환 (GPT-4o Vision)"""
+    if not image_base64:
+        return text
+    content: list = [{"type": "text", "text": text}]
+    if image_base64.startswith("data:"):
+        url = image_base64
+    else:
+        url = f"data:image/jpeg;base64,{image_base64}"
+    content.append({"type": "image_url", "image_url": {"url": url}})
+    return content
+
+
 class LLMService:
     def __init__(self):
         self.llm = ChatOpenAI(
@@ -17,16 +30,16 @@ class LLMService:
             temperature=0.3,
             streaming=True,
             max_tokens=1000,
-            request_timeout=30,
+            request_timeout=60,
         )
-        
+
         self.llm_non_streaming = ChatOpenAI(
             model=settings.OPENAI_MODEL,
             openai_api_key=settings.OPENAI_API_KEY,
             temperature=0.3,
             streaming=False,
             max_tokens=1000,
-            request_timeout=30,
+            request_timeout=60,
         )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
@@ -35,20 +48,21 @@ class LLMService:
         system_prompt: str,
         user_message: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        image_base64: Optional[str] = None,
     ) -> str:
         """Generate a non-streaming response from the LLM."""
         try:
             messages = [SystemMessage(content=system_prompt)]
-            
+
             if chat_history:
                 for msg in chat_history:
                     if msg["role"] == "user":
                         messages.append(HumanMessage(content=msg["content"]))
                     elif msg["role"] == "assistant":
                         messages.append(AIMessage(content=msg["content"]))
-            
-            messages.append(HumanMessage(content=user_message))
-            
+
+            messages.append(HumanMessage(content=_build_human_content(user_message, image_base64)))
+
             response = await self.llm_non_streaming.agenerate([messages])
             return response.generations[0][0].text
 
@@ -62,20 +76,21 @@ class LLMService:
         system_prompt: str,
         user_message: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        image_base64: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
         """Generate a streaming response from the LLM."""
         try:
             messages = [SystemMessage(content=system_prompt)]
-            
+
             if chat_history:
                 for msg in chat_history:
                     if msg["role"] == "user":
                         messages.append(HumanMessage(content=msg["content"]))
                     elif msg["role"] == "assistant":
                         messages.append(AIMessage(content=msg["content"]))
-            
-            messages.append(HumanMessage(content=user_message))
-            
+
+            messages.append(HumanMessage(content=_build_human_content(user_message, image_base64)))
+
             async for chunk in self.llm.astream(messages):
                 if hasattr(chunk, 'content'):
                     yield chunk.content

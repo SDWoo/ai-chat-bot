@@ -30,4 +30,14 @@ def get_db():
 def init_db():
     logger.info("Initializing database")
     Base.metadata.create_all(bind=engine)
+
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "messages" in inspector.get_table_names():
+        cols = [c["name"] for c in inspector.get_columns("messages")]
+        if "image_url" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE messages ADD COLUMN image_url VARCHAR"))
+            logger.info("Added image_url column to messages table")
+
     logger.info("Database initialized")

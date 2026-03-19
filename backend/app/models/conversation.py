@@ -24,6 +24,7 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"))
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
+    image_url = Column(String, nullable=True)
     sources = Column(JSON, nullable=True)
     feedback = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

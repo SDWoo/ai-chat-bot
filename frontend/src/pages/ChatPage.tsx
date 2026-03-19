@@ -1,15 +1,28 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Send, ThumbsUp, ThumbsDown, MessageSquare, BookmarkPlus, Loader2, FileCode2 } from 'lucide-react'
+import { Send, ThumbsUp, ThumbsDown, MessageSquare, BookmarkPlus, Loader2, FileCode2, ImagePlus, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { useChatStore } from '@/store/chatStore'
-import { chatService, conversationService, Message } from '@/services/api'
+import { chatService, conversationService, Message, API_URL } from '@/services/api'
 import SqlPreviewModal from '@/components/SqlPreviewModal'
+
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024 // 20MB
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function ChatPage() {
   const [input, setInput] = useState('')
+  const [pendingImage, setPendingImage] = useState<{ file: File; preview: string; base64: string } | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [_streamingMessageId, setStreamingMessageId] = useState<number | null>(null)
@@ -20,9 +33,71 @@ export default function ChatPage() {
   const [searchSources, setSearchSources] = useState<string[]>(['documents', 'knowledge'])
   const [extractingKnowledge, setExtractingKnowledge] = useState(false)
   const [feedbackStates, setFeedbackStates] = useState<Record<number, 'positive' | 'negative' | null>>({})
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const prevMessagesLengthRef = useRef(0)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const { messages, conversationId, isLoading, addMessage, updateMessage, setConversationId, setIsLoading } = useChatStore()
+
+  const handleImageSelect = useCallback(async (file: File) => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      alert('지원하지 않는 이미지 형식입니다. (JPEG, PNG, GIF, WebP)')
+      return
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      alert('이미지 크기가 20MB를 초과합니다.')
+      return
+    }
+    const base64 = await fileToBase64(file)
+    const preview = URL.createObjectURL(file)
+    setPendingImage({ file, preview, base64 })
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const hasImage = Array.from(e.dataTransfer.types).includes('Files')
+    if (hasImage) setIsDraggingImage(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDraggingImage(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDraggingImage(false)
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) {
+      handleImageSelect(file)
+    }
+  }, [handleImageSelect])
+
+  const removePendingImage = useCallback(() => {
+    if (pendingImage) {
+      URL.revokeObjectURL(pendingImage.preview)
+      setPendingImage(null)
+    }
+  }, [pendingImage])
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) {
+            e.preventDefault()
+            handleImageSelect(file)
+          }
+          break
+        }
+      }
+    }
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  }, [handleImageSelect])
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' })
@@ -52,19 +127,20 @@ export default function ChatPage() {
   }, [isStreaming])
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({ message, imageData }: { message: string; imageData?: string }) => {
       const userMessage: Message = {
         id: Date.now(),
         role: 'user',
         content: message,
+        image_url: pendingImage?.preview,
         created_at: new Date().toISOString(),
       }
       addMessage(userMessage)
       setIsLoading(true)
       setIsStreaming(true)
-      
-      setProcessingStatus('문서 검색 중...')
-      
+
+      setProcessingStatus(imageData ? '이미지 분석 중...' : '문서 검색 중...')
+
       try {
         const assistantMessageId = Date.now() + 1
         const assistantMessage: Message = {
@@ -76,7 +152,6 @@ export default function ChatPage() {
         addMessage(assistantMessage)
         setStreamingMessageId(assistantMessageId)
 
-        // 재시도 시에도 동일한 conversation_id 사용 (중복 대화창 방지)
         const conversationIdToUse = conversationId || crypto.randomUUID()
         if (!conversationId) {
           setConversationId(conversationIdToUse)
@@ -91,6 +166,7 @@ export default function ChatPage() {
         for await (const chunk of chatService.sendMessageStream(
           {
             message,
+            image_data: imageData,
             conversation_id: conversationIdToUse,
             top_k: 4,
             search_sources: searchSources,
@@ -156,10 +232,15 @@ export default function ChatPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
+    if ((!input.trim() && !pendingImage) || isLoading) return
 
-    sendMessageMutation.mutate(input)
+    const imageData = pendingImage?.base64
+    sendMessageMutation.mutate({
+      message: input.trim() || '이 이미지를 분석해 주세요.',
+      imageData,
+    })
     setInput('')
+    removePendingImage()
   }
 
   const handleFeedback = async (messageId: number, feedback: 'positive' | 'negative') => {
@@ -243,6 +324,17 @@ export default function ChatPage() {
                     </div>
                   )}
                   
+                  {message.image_url && (
+                    <div className="mb-3">
+                      <img
+                        src={message.image_url.startsWith('/api') ? `${API_URL}${message.image_url}` : message.image_url}
+                        alt="첨부 이미지"
+                        className="max-w-sm max-h-64 rounded-xl border border-gray-200 dark:border-gray-700 object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+
                   <div className={`markdown-content ${message.role === 'user' ? 'markdown-content-user' : ''}`}>
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm]} 
@@ -341,8 +433,18 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 md:px-6 py-4 md:py-5 shadow-sm transition-colors duration-200">
-        {/* 지식으로 저장 버튼 */}
+      <div
+        className="border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 md:px-6 py-4 md:py-5 shadow-sm transition-colors duration-200 relative"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDraggingImage && (
+          <div className="absolute inset-0 bg-primary-500/10 border-2 border-dashed border-primary-400 rounded-2xl z-10 flex items-center justify-center pointer-events-none">
+            <p className="text-primary-600 dark:text-primary-400 font-bold text-lg">이미지를 놓으세요</p>
+          </div>
+        )}
+
         {conversationId && Object.values(feedbackStates).some(f => f === 'positive') && (
           <div className="max-w-4xl mx-auto mb-3">
             <button
@@ -397,20 +499,58 @@ export default function ChatPage() {
               })}
             </div>
           </div>
+
+          {pendingImage && (
+            <div className="mb-3 relative inline-block">
+              <img
+                src={pendingImage.preview}
+                alt="첨부할 이미지"
+                className="max-h-32 rounded-xl border border-gray-200 dark:border-gray-700 object-contain"
+              />
+              <button
+                type="button"
+                onClick={removePendingImage}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-md"
+              >
+                <X size={14} />
+              </button>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-[200px]">{pendingImage.file.name}</p>
+            </div>
+          )}
           
           <div className="relative">
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImageSelect(file)
+                e.target.value = ''
+              }}
+            />
             <div className="flex gap-2 md:gap-3">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isLoading}
+                className="px-3 md:px-4 py-3 md:py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                title="이미지 첨부"
+              >
+                <ImagePlus size={20} />
+              </button>
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="메시지를 입력하세요"
+                placeholder={pendingImage ? '이미지에 대해 질문하세요...' : '메시지를 입력하세요'}
                 disabled={isLoading}
                 className="flex-1 px-4 md:px-5 py-3 md:py-4 bg-gray-100 dark:bg-gray-800 border-none rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 font-medium text-sm md:text-[15px] transition-all"
               />
               <button
                 type="submit"
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || (!input.trim() && !pendingImage)}
                 className="px-5 md:px-7 py-3 md:py-4 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 active:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-bold shadow-soft transition-all hover:shadow-soft-lg active:scale-95"
               >
                 <Send size={18} className="md:w-5 md:h-5" strokeWidth={2.5} />

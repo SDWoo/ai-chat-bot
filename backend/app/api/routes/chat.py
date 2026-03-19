@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
+import base64
 import re
 import structlog
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import AsyncGenerator
 
 from app.core.database import get_db
@@ -17,6 +19,27 @@ from app.services.unified_search import UnifiedSearchEngine
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+CHAT_IMAGES_DIR = Path("./uploads/chat_images")
+CHAT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _save_chat_image(data_url: str) -> str:
+    """base64 data URL → 파일 저장 후 서빙 경로 반환"""
+    match = re.match(r"data:image/(\w+);base64,(.+)", data_url, re.DOTALL)
+    if not match:
+        raise ValueError("Invalid image data URL format")
+    ext = match.group(1).lower()
+    if ext == "jpeg":
+        ext = "jpg"
+    raw_b64 = match.group(2)
+    image_bytes = base64.b64decode(raw_b64)
+
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = CHAT_IMAGES_DIR / filename
+    filepath.write_bytes(image_bytes)
+
+    return f"/api/chat/images/{filename}"
 
 
 def _normalize_source_display_name(raw: str) -> str:
@@ -60,6 +83,22 @@ def _filter_relevant_sources(sources: list, min_score: float = 0.15) -> list:
     return filtered if filtered else sources[:1]
 
 
+@router.get("/images/{filename}")
+async def get_chat_image(filename: str):
+    """채팅 이미지 서빙"""
+    filepath = CHAT_IMAGES_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    media_type = "image/jpeg"
+    if filename.endswith(".png"):
+        media_type = "image/png"
+    elif filename.endswith(".gif"):
+        media_type = "image/gif"
+    elif filename.endswith(".webp"):
+        media_type = "image/webp"
+    return FileResponse(filepath, media_type=media_type)
+
+
 async def stream_response(
     answer_stream: AsyncGenerator,
     conversation_id: str,
@@ -69,20 +108,17 @@ async def stream_response(
 ) -> AsyncGenerator[str, None]:
     """Stream the response in a format suitable for frontend consumption."""
     import json
-    
+
     try:
-        # Send metadata first
         metadata = {
             'type': 'metadata',
             'conversation_id': conversation_id,
             'sources': sources,
         }
         yield f"data: {json.dumps(metadata)}\n\n"
-        
-        # Collect all chunks for database storage
+
         full_answer = ""
-        
-        # Stream content chunks
+
         async for chunk in answer_stream:
             if chunk:
                 full_answer += chunk
@@ -91,8 +127,7 @@ async def stream_response(
                     'content': chunk,
                 }
                 yield f"data: {json.dumps(content_data)}\n\n"
-        
-        # Save complete message to database
+
         assistant_message = Message(
             conversation_id=conversation.id,
             role="assistant",
@@ -101,10 +136,9 @@ async def stream_response(
         )
         db.add(assistant_message)
         db.commit()
-        
-        # Send completion signal
+
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        
+
     except Exception as e:
         logger.error(f"Error in stream_response: {str(e)}")
         error_data = {
@@ -149,42 +183,48 @@ async def chat(
             if not conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
 
+        # 이미지 처리
+        image_url = None
+        image_base64 = None
+        if request.image_data:
+            try:
+                image_url = _save_chat_image(request.image_data)
+                image_base64 = request.image_data
+            except Exception as img_err:
+                logger.error(f"Image save failed: {img_err}")
+
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
             content=request.message,
+            image_url=image_url,
         )
         db.add(user_message)
         db.commit()
 
-        # Get chat history (excluding current message, limit to last 10 for DB query)
-        # The RAG engine will further limit this to 5 most recent with token consideration
         chat_history = []
         previous_messages = (
             db.query(Message)
             .filter(Message.conversation_id == conversation.id)
             .order_by(Message.created_at.asc())
-            .limit(11)  # Get 11 to exclude the current message (last one)
+            .limit(11)
             .all()
         )
-        
-        # Exclude the current user message (last one) from history
+
         for msg in previous_messages[:-1]:
             chat_history.append({
                 "role": msg.role,
                 "content": msg.content,
             })
-        
+
         logger.info(
             "Chat history retrieved",
             conversation_id=conversation_id,
             history_length=len(chat_history)
         )
 
-        # 통합 검색 사용 (search_sources에 따라)
         user_id = current_user["user_id"]
         if len(request.search_sources) > 1 or "knowledge" in request.search_sources or "web" in request.search_sources:
-            # 통합 검색 엔진 사용 (웹 검색 포함)
             unified_search = UnifiedSearchEngine()
             result = await unified_search.generate_unified_answer(
                 query=request.message,
@@ -193,9 +233,9 @@ async def chat(
                 chat_history=chat_history,
                 stream=False,
                 user_id=user_id,
+                image_base64=image_base64,
             )
         else:
-            # 기존 RAG 엔진 사용 (단일 소스)
             rag_engine = RAGEngine()
             result = await rag_engine.generate_answer(
                 query=request.message,
@@ -204,6 +244,7 @@ async def chat(
                 chat_history=chat_history,
                 stream=False,
                 user_id=user_id,
+                image_base64=image_base64,
             )
 
         assistant_message = Message(
@@ -267,43 +308,48 @@ async def chat_stream(
             db.commit()
             db.refresh(conversation)
 
-        # 사용자 메시지 저장 (새 대화/기존 대화 모두)
+        # 이미지 처리
+        image_url = None
+        image_base64 = None
+        if request.image_data:
+            try:
+                image_url = _save_chat_image(request.image_data)
+                image_base64 = request.image_data
+            except Exception as img_err:
+                logger.error(f"Image save failed: {img_err}")
+
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
             content=request.message,
+            image_url=image_url,
         )
         db.add(user_message)
         db.commit()
 
-        # Get chat history (excluding current message, limit to last 10 for DB query)
-        # The RAG engine will further limit this to 5 most recent with token consideration
         chat_history = []
         previous_messages = (
             db.query(Message)
             .filter(Message.conversation_id == conversation.id)
             .order_by(Message.created_at.asc())
-            .limit(11)  # Get 11 to exclude the current message (last one)
+            .limit(11)
             .all()
         )
-        
-        # Exclude the current user message (last one) from history
+
         for msg in previous_messages[:-1]:
             chat_history.append({
                 "role": msg.role,
                 "content": msg.content,
             })
-        
+
         logger.info(
             "Streaming chat history retrieved",
             conversation_id=conversation_id,
             history_length=len(chat_history)
         )
 
-        # 통합 검색 사용 (search_sources에 따라)
         user_id = current_user["user_id"]
         if len(request.search_sources) > 1 or "knowledge" in request.search_sources or "web" in request.search_sources:
-            # 통합 검색 엔진 사용 (웹 검색 포함)
             unified_search = UnifiedSearchEngine()
             result = await unified_search.generate_unified_answer(
                 query=request.message,
@@ -312,9 +358,9 @@ async def chat_stream(
                 chat_history=chat_history,
                 stream=True,
                 user_id=user_id,
+                image_base64=image_base64,
             )
         else:
-            # 기존 RAG 엔진 사용 (단일 소스)
             rag_engine = RAGEngine()
             result = await rag_engine.generate_answer(
                 query=request.message,
@@ -323,6 +369,7 @@ async def chat_stream(
                 chat_history=chat_history,
                 stream=True,
                 user_id=user_id,
+                image_base64=image_base64,
             )
 
         sources = _filter_relevant_sources([_format_source(doc) for doc in result.get("sources", [])])

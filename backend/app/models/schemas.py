@@ -26,9 +26,10 @@ class DocumentInfo(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    image_data: Optional[str] = None  # base64 data URL (data:image/jpeg;base64,...)
     conversation_id: Optional[str] = None
     collection_name: str = "documents"
-    search_sources: List[str] = Field(default=["documents", "knowledge"])  # 통합 검색 소스
+    search_sources: List[str] = Field(default=["documents", "knowledge"])
     top_k: int = Field(default=4, ge=1, le=15)
 
 
@@ -57,6 +58,7 @@ class MessageInfo(BaseModel):
     id: int
     role: str
     content: str
+    image_url: Optional[str] = None
     sources: Optional[List[Dict[str, Any]]]
     feedback: Optional[str]
     created_at: datetime

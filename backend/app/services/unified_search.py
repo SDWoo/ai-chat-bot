@@ -400,6 +400,7 @@ class UnifiedSearchEngine:
         stream: bool = False,
         max_sources: int = 3,
         user_id: Optional[int] = None,
+        image_base64: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         통합 검색 기반 답변 생성
@@ -477,6 +478,7 @@ class UnifiedSearchEngine:
                         system_prompt=system_prompt,
                         user_message=query,
                         chat_history=chat_history,
+                        image_base64=image_base64,
                     ),
                     "sources": limited_results,
                     "metadata": search_result["metadata"],
@@ -486,6 +488,7 @@ class UnifiedSearchEngine:
                     system_prompt=system_prompt,
                     user_message=query,
                     chat_history=chat_history,
+                    image_base64=image_base64,
                 )
                 
                 return {

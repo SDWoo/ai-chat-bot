@@ -48,6 +48,7 @@ export interface Message {
   id: number
   role: string
   content: string
+  image_url?: string
   sources?: Array<{
     content: string
     source: string
@@ -69,6 +70,7 @@ export interface Conversation {
 
 export interface ChatRequest {
   message: string
+  image_data?: string
   conversation_id?: string
   collection_name?: string
   top_k?: number

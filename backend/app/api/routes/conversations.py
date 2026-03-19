@@ -89,6 +89,7 @@ async def get_conversation_messages(
                 id=msg.id,
                 role=msg.role,
                 content=msg.content,
+                image_url=msg.image_url,
                 sources=msg.sources,
                 feedback=msg.feedback,
                 created_at=msg.created_at,

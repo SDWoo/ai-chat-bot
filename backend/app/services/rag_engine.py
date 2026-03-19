@@ -227,6 +227,7 @@ class RAGEngine:
         stream: bool = False,
         max_sources: int = 2,
         user_id: Optional[int] = None,
+        image_base64: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate an answer to the query using RAG.
@@ -314,6 +315,7 @@ class RAGEngine:
                         system_prompt=system_prompt,
                         user_message=query,
                         chat_history=chat_history,
+                        image_base64=image_base64,
                     ),
                     "sources": filtered_documents,
                     "metadata": {
@@ -328,6 +330,7 @@ class RAGEngine:
                     system_prompt=system_prompt,
                     user_message=query,
                     chat_history=chat_history,
+                    image_base64=image_base64,
                 )
 
                 return {
